@@ -1,14 +1,36 @@
-import { Injectable, Inject, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, FilterQuery } from 'mongoose';
+import {
+  CreateCustomerEmailDto,
+  UpdateCustomerEmailDto,
+  SendEmailDto,
+} from '../dtos/email.dto';
+import { CustomerEmail } from '../entities/email.entity';
+
 import * as nodemailer from 'nodemailer';
 import puppeteer from 'puppeteer';
 
-import { SendEmailDto } from '../dtos/email.dto';
+import { handleException } from 'src/common/handle-exception';
+import { notFoundDocument } from 'src/common/not-found-document';
+import { isNotEmptyDocument } from 'src/common/is-not-empty-document';
+
+const filter: FilterQuery<CustomerEmail> = {};
+filter.deletedAt = { $eq: null };
 
 @Injectable()
 export class EmailService {
   private transporter: any;
 
-  constructor(@Inject('configService') private configService) {
+  constructor(
+    @InjectModel(CustomerEmail.name) private database: Model<CustomerEmail>,
+    @Inject('configService') private configService,
+  ) {
     const { host, port, user, pass, secure } = configService;
     this.transporter = nodemailer.createTransport({
       host,
@@ -62,5 +84,78 @@ export class EmailService {
     } catch (exception) {
       throw new ConflictException(`A conflict has occurredo: ${exception}`);
     }
+  }
+
+  async get() {
+    const data = await this.database.find(filter).exec();
+    if (data.length === 0) {
+      throw new NotFoundException(
+        `There are no customer emails in the database`,
+      );
+    }
+    return data;
+  }
+
+  async getOne(id: string) {
+    const document = await this.database.findById(id).exec();
+    notFoundDocument(document, id, 'Set of customer emails');
+    return document;
+  }
+
+  async create(set: CreateCustomerEmailDto) {
+    try {
+      const data = await new this.database(this.convertEmailData(set)).save();
+      return {
+        message: `The set of emails for the customer ${data.customer} was created`,
+        data: data,
+      };
+    } catch (exception) {
+      handleException(exception);
+    }
+  }
+
+  async update(id: string, set: UpdateCustomerEmailDto) {
+    isNotEmptyDocument(set);
+    await this.getOne(id);
+
+    try {
+      const data = await this.database
+        .findByIdAndUpdate(
+          id,
+          { $set: this.convertEmailData(set) },
+          { new: true },
+        )
+        .exec();
+      return {
+        message: `The set of emails for the customer with ID ${id} was updated`,
+        data: data,
+      };
+    } catch (exception) {
+      handleException(exception);
+    }
+  }
+
+  async delete(id: string) {
+    await this.getOne(id);
+    try {
+      const data = await this.database
+        .findByIdAndUpdate(id, { $currentDate: { deletedAt: true } })
+        .exec();
+      return {
+        message: `The set of emails for the customer with ID ${id} was deleted`,
+        data: data,
+      };
+    } catch (exception) {
+      handleException(exception);
+    }
+  }
+
+  convertEmailData(set: CreateCustomerEmailDto | UpdateCustomerEmailDto) {
+    return {
+      customer: set.customer,
+      reason: set.reason,
+      to: set.to?.join('; '),
+      cc: set.cc?.join('; '),
+    };
   }
 }
