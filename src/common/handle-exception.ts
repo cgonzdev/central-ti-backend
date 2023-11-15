@@ -27,8 +27,9 @@ const handleHttpException = (exception) => {
 const handleMongoError = (exception) => {
   // Duplication in MongoDB (code 11000)
   if (exception.code === 11000) {
+    const field = JSON.stringify(exception.keyValue).replace(/[{}"\\]/g, '');
     throw new BadRequestException(
-      `The element you are trying to create is already created for the field ${exception}`,
+      `The element you are trying to create is already created for the field -> ${field}`,
     );
   }
 };

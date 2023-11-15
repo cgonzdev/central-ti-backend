@@ -9,6 +9,7 @@ import { Model, FilterQuery } from 'mongoose';
 import {
   CreateCustomerEmailDto,
   UpdateCustomerEmailDto,
+  SendBulkEmailDto,
   SendEmailDto,
 } from '../dtos/email.dto';
 import { CustomerEmail } from '../entities/email.entity';
@@ -19,6 +20,7 @@ import puppeteer from 'puppeteer';
 import { handleException } from 'src/common/handle-exception';
 import { notFoundDocument } from 'src/common/not-found-document';
 import { isNotEmptyDocument } from 'src/common/is-not-empty-document';
+import { mailStructure } from 'src/common/mail-structure';
 
 const filter: FilterQuery<CustomerEmail> = {};
 filter.deletedAt = { $eq: null };
@@ -86,6 +88,28 @@ export class EmailService {
     }
   }
 
+  async bulkSend(email: SendBulkEmailDto) {
+    filter.category = { $eq: email.category };
+    const data = await this.get();
+    const output = 'The email was successfully sent to the following customers';
+    const customers = [];
+
+    for (const item of data) {
+      const mail = mailStructure(
+        this.configService.user,
+        item.to,
+        item.cc,
+        email.subject,
+        email.body,
+      );
+
+      await this.transporter.sendMail(mail);
+      customers.push(item.customer);
+    }
+    delete filter.category;
+    return output.concat(' ', customers.join(', '));
+  }
+
   async get() {
     const data = await this.database.find(filter).exec();
     if (data.length === 0) {
@@ -151,11 +175,9 @@ export class EmailService {
   }
 
   convertEmailData(set: CreateCustomerEmailDto | UpdateCustomerEmailDto) {
-    return {
-      customer: set.customer,
-      reason: set.reason,
-      to: set.to?.join('; '),
-      cc: set.cc?.join('; '),
-    };
+    const obj = JSON.parse(JSON.stringify(set));
+    obj.to = set.to?.map((item) => item.email).join('; ');
+    obj.cc = set.cc?.map((item) => item.email).join('; ');
+    return obj;
   }
 }

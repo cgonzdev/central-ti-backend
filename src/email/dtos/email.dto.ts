@@ -58,6 +58,28 @@ export class SendEmailDto {
   readonly isHTML: boolean;
 }
 
+export class SendBulkEmailDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  readonly category: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  readonly subject: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  readonly body: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  readonly attachment: string;
+}
+
 export class CreateCustomerEmailDto {
   @ApiProperty()
   @IsString()
@@ -68,6 +90,11 @@ export class CreateCustomerEmailDto {
   @IsString()
   @IsNotEmpty()
   readonly reason: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  readonly category: string;
 
   @ApiProperty()
   @IsArray()
