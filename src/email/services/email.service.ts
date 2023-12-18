@@ -50,6 +50,7 @@ export class EmailService {
         subject: email.subject,
         text: undefined,
         html: undefined,
+        attachments: [],
       };
 
       if (email.isHTML) {
@@ -59,19 +60,11 @@ export class EmailService {
 
         await new Promise((resolve) => setTimeout(resolve, 15000));
 
-        const currentHtml = await page.content();
+        const html = await page.content();
         await page.setViewport({ width: 1080, height: 1024 });
 
-        const modifiedHtml = currentHtml.replace(
-          /<img[^>]+src=['"]([^'"]+)['"][^>]*>/g,
-          (match, src) => {
-            const currentSrc = new URL(src, page.url()).href;
-            return match.replace(src, currentSrc);
-          },
-        );
-
         await browser.close();
-        mailStructure.html = modifiedHtml;
+        mailStructure.html = html;
       } else {
         mailStructure.text = email.body;
       }

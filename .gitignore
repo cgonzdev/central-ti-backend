@@ -37,3 +37,6 @@ lerna-debug.log*
 # Environments
 *.env
 /mongo_data_dev
+
+# Own
+src/assets
