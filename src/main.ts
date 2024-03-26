@@ -8,7 +8,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const appOptions = { exclude: [{ path: '/', method: RequestMethod.GET }] };
   app.setGlobalPrefix('api', appOptions);
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+  );
   const config = new DocumentBuilder()
     .setTitle('Central TI API')
     .setDescription('Backend and API for Central TI')

@@ -9,18 +9,24 @@ import { Model, FilterQuery } from 'mongoose';
 import {
   CreateCustomerEmailDto,
   UpdateCustomerEmailDto,
+  SendNewsletterEmailDto,
   SendBulkEmailDto,
   SendEmailDto,
 } from '../dtos/email.dto';
 import { CustomerEmail } from '../entities/email.entity';
 
 import * as nodemailer from 'nodemailer';
-import puppeteer from 'puppeteer';
+import Handlebars from 'handlebars';
 
-import { handleException } from 'src/common/handle-exception';
-import { notFoundDocument } from 'src/common/not-found-document';
-import { isNotEmptyDocument } from 'src/common/is-not-empty-document';
-import { mailStructure } from 'src/common/mail-structure';
+import { handleException } from '@/common/handle-exception';
+import { notFoundDocument } from '@/common/not-found-document';
+import { isNotEmptyDocument } from '@/common/is-not-empty-document';
+import { mailStructure } from '@/common/mail-structure';
+
+import { APP_INFO } from '@/common/common-data';
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const fs = require('fs');
 
 const filter: FilterQuery<CustomerEmail> = {};
 filter.deletedAt = { $eq: null };
@@ -33,7 +39,8 @@ export class EmailService {
     @InjectModel(CustomerEmail.name) private database: Model<CustomerEmail>,
     @Inject('configService') private configService,
   ) {
-    const { host, port, user, pass, secure } = configService;
+    const { host, port, user, pass } = configService;
+    const secure = Boolean(configService.secure); //* only accepts true or false
     this.transporter = nodemailer.createTransport({
       host,
       port,
@@ -53,21 +60,8 @@ export class EmailService {
         attachments: [],
       };
 
-      if (email.isHTML) {
-        const browser = await puppeteer.launch({ headless: 'new' });
-        const page = await browser.newPage();
-        await page.goto(email.body, { waitUntil: 'domcontentloaded' });
-
-        await new Promise((resolve) => setTimeout(resolve, 15000));
-
-        const html = await page.content();
-        await page.setViewport({ width: 1080, height: 1024 });
-
-        await browser.close();
-        mailStructure.html = html;
-      } else {
-        mailStructure.text = email.body;
-      }
+      if (email.isHTML) mailStructure.html = email.body;
+      else mailStructure.text = email.body;
 
       const info = await this.transporter.sendMail(mailStructure);
 
@@ -77,7 +71,7 @@ export class EmailService {
         to: email.to,
       };
     } catch (exception) {
-      throw new ConflictException(`A conflict has occurredo: ${exception}`);
+      throw new ConflictException(`A conflict has occurred: ${exception}`);
     }
   }
 
@@ -164,6 +158,52 @@ export class EmailService {
       };
     } catch (exception) {
       handleException(exception);
+    }
+  }
+
+  async sendNewsletter(email: SendNewsletterEmailDto) {
+    try {
+      const images = 'src/assets/images';
+      const mailStructure = {
+        from: this.configService.user,
+        to: 'me@central-ti',
+        subject: email.subject,
+        html: undefined,
+        attachments: [
+          {
+            filename: 'fingerprint.svg',
+            path: `${images}/fingerprint.svg`,
+            cid: 'fingerprint.svg',
+          },
+          {
+            filename: 'newsletters_logo.svg',
+            path: `${images}/newsletters_logo.svg`,
+            cid: 'newsletters_logo.svg',
+          },
+          {
+            filename: 'figures.svg',
+            path: `${images}/figures.svg`,
+            cid: 'figures.svg',
+          },
+        ],
+      };
+
+      const htmlContentRoute = 'src/email/views/newsletter.template.html';
+      let html = await fs.readFileSync(htmlContentRoute, 'utf8');
+
+      const template = Handlebars.compile(html);
+      html = template({ n: APP_INFO.newsletter, newsletter: email.newsletter });
+
+      mailStructure.html = html;
+
+      const info = await this.transporter.sendMail(mailStructure);
+
+      return {
+        id: info.messageId,
+        messaje: 'Newsletter sent successfully',
+      };
+    } catch (exception) {
+      throw new ConflictException(`A conflict has occurred: ${exception}`);
     }
   }
 

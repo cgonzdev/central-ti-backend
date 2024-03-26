@@ -12,6 +12,7 @@ import { EmailService } from '../services/email.service';
 import {
   CreateCustomerEmailDto,
   UpdateCustomerEmailDto,
+  SendNewsletterEmailDto,
   SendBulkEmailDto,
   SendEmailDto,
 } from '../dtos/email.dto';
@@ -33,6 +34,12 @@ export class EmailController {
   @ApiOperation({ summary: 'Send a email' })
   send(@Body() email: SendEmailDto) {
     return this.emailService.send(email);
+  }
+
+  @Post('send-newsletter')
+  @ApiOperation({ summary: 'Send the newsletter to customers' })
+  sendNewsletter(@Body() email: SendNewsletterEmailDto) {
+    return this.emailService.sendNewsletter(email);
   }
 
   @Get()

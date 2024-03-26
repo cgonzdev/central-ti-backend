@@ -2,6 +2,7 @@ import {
   IsString,
   IsBoolean,
   IsEmail,
+  IsUrl,
   IsObject,
   IsArray,
   ArrayUnique,
@@ -29,6 +30,34 @@ class Recipient {
   @IsString()
   @IsNotEmpty()
   readonly company: string;
+}
+
+class Notices {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  readonly title: string;
+
+  @ApiProperty()
+  @IsUrl()
+  @IsNotEmpty()
+  readonly link: string;
+}
+
+class Newsletter {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  readonly title: string;
+
+  @ApiProperty()
+  @IsArray()
+  @ArrayUnique((dto) => dto.title)
+  @ArrayNotEmpty()
+  @IsObject({ each: true })
+  @ValidateNested()
+  @Type(() => Notices)
+  readonly notices: Notices[];
 }
 
 export class SendEmailDto {
@@ -78,6 +107,22 @@ export class SendBulkEmailDto {
   @IsString()
   @IsOptional()
   readonly attachment: string;
+}
+
+export class SendNewsletterEmailDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  readonly subject: string;
+
+  @ApiProperty()
+  @IsArray()
+  @ArrayUnique((dto) => dto.title)
+  @ArrayNotEmpty()
+  @IsObject({ each: true })
+  @ValidateNested()
+  @Type(() => Newsletter)
+  readonly newsletter: Newsletter[];
 }
 
 export class CreateCustomerEmailDto {
