@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { ShodanModule } from './shodan/shodan.module';
 import { EmailModule } from './email/email.module';
+import { WebScrapingModule } from './web-scraping/web-scraping.module';
 
 import config from './config';
 
@@ -28,6 +29,7 @@ import config from './config';
     DatabaseModule,
     ShodanModule,
     EmailModule,
+    WebScrapingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
