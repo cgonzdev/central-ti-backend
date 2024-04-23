@@ -111,6 +111,11 @@ export class SendBulkEmailDto {
 
 export class SendNewsletterEmailDto {
   @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
+  readonly to: string;
+
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   readonly subject: string;

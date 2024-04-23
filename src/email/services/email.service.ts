@@ -166,7 +166,7 @@ export class EmailService {
       const images = 'src/assets/images';
       const mailStructure = {
         from: this.configService.user,
-        to: 'me@central-ti',
+        to: email.to,
         subject: email.subject,
         html: undefined,
         attachments: [
@@ -200,7 +200,7 @@ export class EmailService {
 
       return {
         id: info.messageId,
-        messaje: 'Newsletter sent successfully',
+        messaje: 'Newsletter sent successfully to ' + email.to,
       };
     } catch (exception) {
       throw new ConflictException(`A conflict has occurred: ${exception}`);
