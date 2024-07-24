@@ -1,0 +1,35 @@
+# Git configuration files
+.git
+.gitignore
+
+# Docker configuration files
+Dockerfile
+.dockerignore
+
+# Build and output directories
+dist
+build
+
+# Dependencies and libraries files
+node_modules
+
+# Environment configuration files
+*.env
+
+# Logs files or folders
+logs
+*.log
+
+# Temporal files
+tmp
+temp
+*.tmp
+
+# Test directories
+test
+coverage
+
+# IDE/editor configuration files
+.vscode
+.idea
+*.swp
