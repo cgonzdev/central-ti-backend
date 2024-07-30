@@ -1,15 +1,20 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { JwtService } from '@nestjs/jwt';
 import { Model } from 'mongoose';
 
 import { AuthDto } from '../dtos/auth.dto';
 import { User } from '../entities/user.entity';
+import { JwtPayload } from '../interfaces/jwt-payload.interface';
 
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
-  constructor(@InjectModel(User.name) private database: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private database: Model<User>,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async login(auth: AuthDto) {
     const user = await this.database.findById(auth.id).exec();
@@ -22,6 +27,12 @@ export class AuthService {
       throw new UnauthorizedException(`Credentials are not valid`);
     }
 
-    return user;
+    const { name, email } = user;
+
+    return { name, email, token: this.getJwtToken({ name, email }) };
+  }
+
+  private getJwtToken(payload: JwtPayload) {
+    return this.jwtService.sign(payload);
   }
 }

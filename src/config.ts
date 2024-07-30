@@ -17,5 +17,9 @@ export default registerAs('config', () => {
       pass: process.env.MAIL_PASS,
       secure: process.env.MAIL_SECURE,
     },
+    security: {
+      jwtSecret: process.env.JWT_SECRET,
+      jwtExpires: process.env.JWT_EXPIRES,
+    },
   };
 });
