@@ -9,6 +9,7 @@ import { ShodanModule } from './shodan/shodan.module';
 import { EmailModule } from './email/email.module';
 import { WebScrapingModule } from './web-scraping/web-scraping.module';
 import { InfoModule } from './info/info.module';
+import { AuthModule } from './auth/auth.module';
 
 import config from './config';
 
@@ -32,6 +33,7 @@ import config from './config';
     EmailModule,
     WebScrapingModule,
     InfoModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
