@@ -28,6 +28,11 @@ class Services {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  readonly id: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
   readonly name: string;
 
   @ApiProperty()

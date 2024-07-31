@@ -12,6 +12,7 @@ interface iLeaders {
 }
 
 const Services = {
+  id: { type: String, required: true },
   name: { type: String, required: true },
   description: { type: String, required: true },
   enabled: { type: Boolean, required: true },
@@ -19,6 +20,7 @@ const Services = {
 };
 
 interface iServices {
+  id: string;
   name: string;
   description: string;
   enabled: boolean;

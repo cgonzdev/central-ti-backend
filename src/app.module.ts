@@ -26,6 +26,8 @@ import config from './config';
         MONGO_PORT: Joi.number().required(),
         MONGO_HOST: Joi.string().required(),
         MONGO_CONNECTION: Joi.string().required(),
+        JWT_SECRET: Joi.string().required(),
+        JWT_EXPIRES: Joi.string().required(),
       }),
     }),
     DatabaseModule,

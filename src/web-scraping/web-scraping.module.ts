@@ -8,13 +8,16 @@ import {
   WSVulnerabilitiesSchema,
 } from './entities/ws-vulnerabilities.entity';
 
+import { WebScrapingController } from './controllers/web-scraping.controller';
+import { WebScrapingService } from './services/web-scraping.service';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: WSVulnerabilities.name, schema: WSVulnerabilitiesSchema },
     ]),
   ],
-  controllers: [WSVulnerabilitiesController],
-  providers: [WSVulnerabilitiesService],
+  controllers: [WSVulnerabilitiesController, WebScrapingController],
+  providers: [WSVulnerabilitiesService, WebScrapingService],
 })
 export class WebScrapingModule {}

@@ -41,9 +41,9 @@ export class WSVulnerabilitiesService {
     return data;
   }
 
-  async create(event: CreateWSVulnerabilitiesDto) {
+  async create(wsv: CreateWSVulnerabilitiesDto) {
     try {
-      const data = await new this.database(event).save();
+      const data = await new this.database(wsv).save();
       return {
         message: 'ws vulnerabilities was created',
         data: data,

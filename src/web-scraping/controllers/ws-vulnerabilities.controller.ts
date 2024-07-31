@@ -25,7 +25,7 @@ export class WSVulnerabilitiesController {
 
   @Post()
   @ApiOperation({ summary: 'Create a ws vulnerabilities record' })
-  create(@Body() event: CreateWSVulnerabilitiesDto) {
-    return this.wsvService.create(event);
+  create(@Body() wsv: CreateWSVulnerabilitiesDto) {
+    return this.wsvService.create(wsv);
   }
 }
