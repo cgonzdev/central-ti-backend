@@ -10,6 +10,7 @@ import puppeteer from 'puppeteer';
 
 import { WebScrapingVulnDto } from '../dtos/web-scraping.dto';
 import { WSVulnerabilities } from '../entities/ws-vulnerabilities.entity';
+import { ExcelService } from '@/file-generator/services/excel.service';
 
 import { handleException } from '@/common/handle-exception';
 
@@ -18,9 +19,12 @@ export class WebScrapingService {
   constructor(
     @InjectModel(WSVulnerabilities.name)
     private wsvDatabase: Model<WSVulnerabilities>,
+    private excelService: ExcelService,
   ) {}
 
   async wsvuln(request: WebScrapingVulnDto) {
+    const vuln_data = [];
+
     try {
       const data = await this.wsvDatabase
         .findOne({ customer: request.customer })
@@ -35,7 +39,6 @@ export class WebScrapingService {
 
       const vulnInfo = JSON.parse(JSON.stringify(data));
 
-      const vuln_data = [];
       const baseURL =
         'https://www.incibe.es/incibe-cert/alerta-temprana/vulnerabilidades';
 
@@ -62,7 +65,7 @@ export class WebScrapingService {
         let attempt = 0;
         while (attempt < 5) {
           try {
-            await page.goto(site, { waitUntil: 'load', timeout: 10000 });
+            await page.goto(site, { waitUntil: 'load', timeout: 60000 });
             break;
           } catch (error) {
             console.log(`Attempt ${attempt + 1} failed: ${error.message}`);
@@ -101,16 +104,26 @@ export class WebScrapingService {
         });
 
         if (!vulnerabilities_links) {
-          console.log(`404 Not found for ${technology.name}`);
+          console.warn(`404 Not found for ${technology.name}`);
           vulnInfo.technologies[dIndex].incibe = false;
           dIndex++;
           continue;
         }
 
+        console.info(`200 OK found for ${technology.name}`);
+
         for (const vuln of vulnerabilities_links) {
-          await page.goto(`https://www.incibe.es/${vuln}`);
+          await page.goto(`https://www.incibe.es/${vuln}`, {
+            waitUntil: 'load',
+            timeout: 60000,
+          });
           const page_data = await page.evaluate(() => {
             const title = document.querySelector('.node-title').textContent;
+
+            const CVE =
+              document.querySelector('.breadcrumb').lastElementChild
+                .textContent;
+
             const description = document.querySelector(
               '.field-vulnerability-description .content',
             ).textContent;
@@ -133,29 +146,61 @@ export class WebScrapingService {
               .querySelectorAll('.field-vulnerability-documents a')
               .forEach((item) => references.push(item.getAttribute('href')));
 
-            return {
-              title: title,
-              description: description,
-              severity: data[0],
-              type: data[1],
-              publishDate: data[2],
-              updateDate: data[3],
-              references: references,
-            };
+            const severity = data[0];
+            const type = data[1];
+            const publishDate = data[2];
+            const updateDate = data[3];
+
+            return [
+              title.trim(),
+              CVE.trim(),
+              description.trim(),
+              severity.trim(),
+              type.trim(),
+              publishDate.trim(),
+              updateDate.trim(),
+              references.join('\n'),
+            ];
           });
 
-          dIndex++;
+          page_data.splice(3, 0, technology.name.trim());
           vuln_data.push(page_data);
         }
+
+        vulnInfo.technologies[dIndex].incibe = true;
       }
 
+      dIndex++;
       console.log(vuln_data);
 
       await browser.close();
-      return data;
+      return vulnInfo;
     } catch (exception) {
       handleException(exception);
       throw new ConflictException(`A conflict has occurredo: ${exception}`);
+    } finally {
+      if (vuln_data.length > 0) {
+        this.excelService.generate(
+          this.excelColumns(),
+          vuln_data,
+          'Vulnerabilities',
+          'vuln',
+        );
+      }
     }
+  }
+
+  excelColumns(): string[] {
+    return [
+      'Title',
+      'CVE',
+      'Description',
+      'Product',
+      'Severity',
+      'Type',
+      'Publish date',
+      'Update date',
+      'References',
+    ];
   }
 }
