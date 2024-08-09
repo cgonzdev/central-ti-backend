@@ -41,6 +41,21 @@ export class WSVulnerabilitiesService {
     return data;
   }
 
+  async getByCustomer(customer: string) {
+    const data = await this.database
+      .findOne({ customer: customer })
+      .select('-_id -createdAt -updatedAt -__v -technologies._id')
+      .exec();
+
+    if (!data || data.deletedAt !== null) {
+      throw new NotFoundException(
+        `Record with customer => ${customer} not found`,
+      );
+    }
+
+    return JSON.parse(JSON.stringify(data));
+  }
+
   async create(wsv: CreateWSVulnerabilitiesDto) {
     try {
       const data = await new this.database(wsv).save();

@@ -1,206 +1,245 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import puppeteer from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer';
 
-import { WebScrapingVulnDto } from '../dtos/web-scraping.dto';
-import { WSVulnerabilities } from '../entities/ws-vulnerabilities.entity';
+import { EnumType, WebScrapingVulnDto } from '../dtos/web-scraping.dto';
 import { ExcelService } from '@/file-generator/services/excel.service';
 
 import { handleException } from '@/common/handle-exception';
+import { WSVulnerabilitiesService } from './ws-vulnerabilities.service';
 
 @Injectable()
 export class WebScrapingService {
+  vuln_data = []; //* Global variable
+
   constructor(
-    @InjectModel(WSVulnerabilities.name)
-    private wsvDatabase: Model<WSVulnerabilities>,
+    private wsvService: WSVulnerabilitiesService,
     private excelService: ExcelService,
   ) {}
 
   async wsvuln(request: WebScrapingVulnDto) {
-    const vuln_data = [];
-
     try {
-      const data = await this.wsvDatabase
-        .findOne({ customer: request.customer })
-        .select('-_id -createdAt -updatedAt -__v -technologies._id')
-        .exec();
+      this.vuln_data = [];
 
-      if (!data || data.deletedAt !== null) {
-        throw new NotFoundException(
-          `Record with customer => ${request.customer} not found`,
-        );
-      }
-
-      const vulnInfo = JSON.parse(JSON.stringify(data));
-
-      const baseURL =
-        'https://www.incibe.es/incibe-cert/alerta-temprana/vulnerabilidades';
-
-      const browser = await puppeteer.launch({
+      const browser: Browser = await puppeteer.launch({
         headless: false,
         slowMo: 400,
       });
-      const page = await browser.newPage();
-      let dIndex = 0;
 
-      for (const technology of vulnInfo.technologies) {
-        const params = new URLSearchParams({
-          field_vulnerability_title_es: technology.name,
-          'field_vul_publication_date[min]': '2024-07-17',
-          'field_vul_publication_date[max]': '2024-07-24',
-          name: '',
-          field_vul_product: '',
-          field_vul_severity_txt_31: 'All',
-          field_vul_vendor: '',
-        });
+      if (request.type === EnumType.Customer) {
+        const vulnInfo = await this.wsvService.getByCustomer(request.tag);
 
-        const site = `${baseURL}?${params.toString()}`;
+        if (vulnInfo) {
+          for (const technology of vulnInfo.technologies) {
+            const incibeParams = {
+              technology: technology.name,
+              dateMin: request.dateMin,
+              dateMax: request.dateMax,
+            };
 
-        let attempt = 0;
-        while (attempt < 5) {
-          try {
-            await page.goto(site, { waitUntil: 'load', timeout: 60000 });
-            break;
-          } catch (error) {
-            console.log(`Attempt ${attempt + 1} failed: ${error.message}`);
-            attempt++;
-            await new Promise((res) => setTimeout(res, 5000));
-            if (attempt >= 5) {
-              console.log('Max retries reached. Unable to load the page.');
-              await browser.close();
-              throw new Error('Failed to load page after multiple attempts');
-            }
+            await this.incibe(browser, incibeParams);
           }
         }
-
-        await page.setViewport({ width: 1080, height: 1024 });
-
-        const vulnerabilities_links = await page.evaluate(() => {
-          // verifies that the element containing the vulnerabilities exists
-          const existsInfo = document.getElementById(
-            'views-bootstrap-vulnerabilities-page-1',
-          );
-
-          // If it does not exist, do not continue with the scrapping process
-          if (!existsInfo) return;
-
-          // gets all nodes with the vulnerabilities
-          const elements = document.querySelectorAll(
-            '#views-bootstrap-vulnerabilities-page-1 a[href]',
-          );
-
-          // filters and returns only the urls
-          const links = Array.from(elements).map((item) => {
-            return item.getAttribute('href');
-          });
-
-          return links;
-        });
-
-        if (!vulnerabilities_links) {
-          console.warn(`404 Not found for ${technology.name}`);
-          vulnInfo.technologies[dIndex].incibe = false;
-          dIndex++;
-          continue;
+      } else if (request.type === EnumType.Technology) {
+        const incibeParams = JSON.parse(JSON.stringify(request));
+        if (request.site === 'INCIBE') {
+          incibeParams.technology = request.tag;
+          await this.incibe(browser, incibeParams);
         }
-
-        console.info(`200 OK found for ${technology.name}`);
-
-        for (const vuln of vulnerabilities_links) {
-          await page.goto(`https://www.incibe.es/${vuln}`, {
-            waitUntil: 'load',
-            timeout: 60000,
-          });
-          const page_data = await page.evaluate(() => {
-            const title = document.querySelector('.node-title').textContent;
-
-            const CVE =
-              document.querySelector('.breadcrumb').lastElementChild
-                .textContent;
-
-            const description = document.querySelector(
-              '.field-vulnerability-description .content',
-            ).textContent;
-
-            const desc_div = document.querySelector(
-              '.field-vulnerability-description',
-            );
-
-            const desc_div_data = Array.from(
-              desc_div.children[0].querySelectorAll('.date'),
-            );
-
-            const data = desc_div_data.map((item) => {
-              return item.textContent.trim();
-            });
-
-            const references = [];
-
-            document
-              .querySelectorAll('.field-vulnerability-documents a')
-              .forEach((item) => references.push(item.getAttribute('href')));
-
-            const severity = data[0];
-            const type = data[1];
-            const publishDate = data[2];
-            const updateDate = data[3];
-
-            return [
-              title.trim(),
-              CVE.trim(),
-              description.trim(),
-              severity.trim(),
-              type.trim(),
-              publishDate.trim(),
-              updateDate.trim(),
-              references.join('\n'),
-            ];
-          });
-
-          page_data.splice(3, 0, technology.name.trim());
-          vuln_data.push(page_data);
-        }
-
-        vulnInfo.technologies[dIndex].incibe = true;
       }
 
-      dIndex++;
-      console.log(vuln_data);
-
       await browser.close();
-      return vulnInfo;
+
+      return 'ok';
     } catch (exception) {
       handleException(exception);
       throw new ConflictException(`A conflict has occurredo: ${exception}`);
     } finally {
-      if (vuln_data.length > 0) {
-        this.excelService.generate(
-          this.excelColumns(),
-          vuln_data,
-          'Vulnerabilities',
-          'vuln',
-        );
+      if (this.vuln_data.length > 0) {
+        this.excelExport(this.vuln_data, 'Vulnerabitilies', 'hoy');
       }
     }
   }
 
-  excelColumns(): string[] {
-    return [
+  async incibe(browser: Browser, request: any) {
+    const baseURL =
+      'https://www.incibe.es/incibe-cert/alerta-temprana/vulnerabilidades';
+
+    const params = new URLSearchParams({
+      field_vulnerability_title_es: request.technology,
+      'field_vul_publication_date[min]': request.dateMin,
+      'field_vul_publication_date[max]': request.dateMax,
+      name: '',
+      field_vul_product: '',
+      field_vul_severity_txt_31: 'All',
+      field_vul_vendor: '',
+    });
+
+    try {
+      // Create a new page in the browser
+      const page: Page = await browser.newPage();
+      const site = `${baseURL}?${params.toString()}`;
+
+      // Try to establish a connection with the website, with a maximum of 5 attempts at 5 second intervals if there are failures
+      let attempt = 0;
+      while (attempt < 5) {
+        try {
+          await page.goto(site, { waitUntil: 'load', timeout: 60000 });
+          break;
+        } catch (error) {
+          console.log(`Attempt ${attempt + 1} failed: ${error.message}`);
+          attempt++;
+          await new Promise((res) => setTimeout(res, 5000));
+          if (attempt >= 5) {
+            console.log('Max retries reached. Unable to load the page.');
+            await browser.close();
+            throw new Error('Failed to load page after multiple attempts');
+          }
+        }
+      }
+
+      // Set the browser viewport
+      await page.setViewport({ width: 1080, height: 1024 });
+
+      // Verify that a class exists, from here it is determined whether or not there are results
+      const existsInfo = await page.$(
+        '#views-bootstrap-vulnerabilities-page-1',
+      );
+
+      if (existsInfo) {
+        // Check if the class that determines pagination exists.
+        const pager = await page.$('.pager');
+        let nextPage = null;
+
+        // Run the entire information gathering process at least once. If pager is set, the loop continues until the pages end
+        do {
+          // Gets the links where the vulnerabilities information is
+          const vulnerabilities_links = await page.evaluate(() => {
+            // verifies that the element containing the vulnerabilities exists
+            const existsInfo = document.getElementById(
+              'views-bootstrap-vulnerabilities-page-1',
+            );
+
+            // If it does not exist, do not continue with the scrapping process
+            if (!existsInfo) return;
+
+            // gets all nodes with the vulnerabilities
+            const elements = document.querySelectorAll(
+              '#views-bootstrap-vulnerabilities-page-1 a[href]',
+            );
+
+            // filters and returns only the urls
+            const links = Array.from(elements).map((item) => {
+              return item.getAttribute('href');
+            });
+
+            return links;
+          });
+
+          // If there are no links, return
+          if (!vulnerabilities_links) {
+            console.warn(`404 Not found for ${request.technology}`);
+            return 404;
+          }
+
+          // If links exist, report a status of ok and create a new tab
+          console.info(`200 OK found for ${request.technology}`);
+          const newPage = await browser.newPage();
+
+          // It iterates over the number of links in a loop [for ... of], to handle asynchrony
+          for (const vuln of vulnerabilities_links) {
+            // Go to the specific link of the vulnerability
+            await newPage.goto(`https://www.incibe.es/${vuln}`, {
+              waitUntil: 'load',
+              timeout: 60000,
+            });
+
+            // Evaluate and return all necessary data
+            const page_data = await newPage.evaluate(() => {
+              const title = document.querySelector('.node-title').textContent;
+
+              const CVE =
+                document.querySelector('.breadcrumb').lastElementChild
+                  .textContent;
+
+              const description = document.querySelector(
+                '.field-vulnerability-description .content',
+              ).textContent;
+
+              const desc_div = document.querySelector(
+                '.field-vulnerability-description',
+              );
+
+              const desc_div_data = Array.from(
+                desc_div.children[0].querySelectorAll('.date'),
+              );
+
+              const data = desc_div_data.map((item) => {
+                return item.textContent.trim();
+              });
+
+              const references = [];
+
+              document
+                .querySelectorAll('.field-vulnerability-documents a')
+                .forEach((item) => references.push(item.getAttribute('href')));
+
+              const severity = data[0];
+              const publishDate = data[2];
+              const updateDate = data[3];
+
+              return [
+                title.trim(),
+                CVE.trim(),
+                description.trim(),
+                severity.trim(),
+                publishDate.trim(),
+                updateDate.trim(),
+                references.join('\n'),
+              ];
+            });
+
+            // The data is added to the array for later use
+            page_data.splice(3, 0, request.technology.trim());
+            this.vuln_data.push(page_data);
+          }
+
+          // The previously created tab is closed
+          await newPage.close();
+
+          // Check if a new page exists in the search pager
+          nextPage = await page.$('.pager a[rel="next"]');
+
+          // If it exists, on the first page, it simulates a click on the next page and continues the loop
+          if (nextPage) {
+            await Promise.all([
+              page.waitForNavigation({ waitUntil: 'networkidle0' }),
+              page.click('.pager a[rel="next"]'),
+            ]);
+          }
+        } while (pager && nextPage);
+      }
+
+      await page.close();
+      return 'ok';
+    } catch (exception) {
+      handleException(exception);
+      throw new ConflictException(`A conflict has occurredo: ${exception}`);
+    }
+  }
+
+  excelExport(data: any, sheetName: string, xlsxName: string) {
+    const columns = [
       'Title',
       'CVE',
       'Description',
       'Product',
       'Severity',
-      'Type',
       'Publish date',
       'Update date',
       'References',
     ];
+
+    this.excelService.generate(columns, data, sheetName, xlsxName);
   }
 }
