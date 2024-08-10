@@ -19,14 +19,14 @@ class Technologies {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  readonly description: object;
+  readonly owner: object;
 }
 
 export class CreateWSVulnerabilitiesDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  readonly customer: string;
+  readonly tag: string;
 
   @ApiProperty()
   @IsArray()

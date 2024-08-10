@@ -41,16 +41,14 @@ export class WSVulnerabilitiesService {
     return data;
   }
 
-  async getByCustomer(customer: string) {
+  async getByTag(tag: string) {
     const data = await this.database
-      .findOne({ customer: customer })
+      .findOne({ tag: tag })
       .select('-_id -createdAt -updatedAt -__v -technologies._id')
       .exec();
 
     if (!data || data.deletedAt !== null) {
-      throw new NotFoundException(
-        `Record with customer => ${customer} not found`,
-      );
+      throw new NotFoundException(`Record with customer => ${tag} not found`);
     }
 
     return JSON.parse(JSON.stringify(data));

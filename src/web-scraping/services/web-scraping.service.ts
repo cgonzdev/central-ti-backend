@@ -11,6 +11,7 @@ import { WSVulnerabilitiesService } from './ws-vulnerabilities.service';
 @Injectable()
 export class WebScrapingService {
   vuln_data = []; //* Global variable
+  excelName = 'export';
 
   constructor(
     private wsvService: WSVulnerabilitiesService,
@@ -27,12 +28,14 @@ export class WebScrapingService {
       });
 
       if (request.type === EnumType.Customer) {
-        const vulnInfo = await this.wsvService.getByCustomer(request.tag);
+        const vulnInfo = await this.wsvService.getByTag(request.tag);
 
         if (vulnInfo) {
+          this.excelName = `${vulnInfo.tag}_${request.dateMin}_${request.dateMax}`;
           for (const technology of vulnInfo.technologies) {
             const incibeParams = {
               technology: technology.name,
+              owner: technology.owner,
               dateMin: request.dateMin,
               dateMax: request.dateMax,
             };
@@ -56,7 +59,7 @@ export class WebScrapingService {
       throw new ConflictException(`A conflict has occurredo: ${exception}`);
     } finally {
       if (this.vuln_data.length > 0) {
-        this.excelExport(this.vuln_data, 'Vulnerabitilies', 'hoy');
+        this.excelExport(this.vuln_data, 'Vulnerabitilies', this.excelName);
       }
     }
   }
@@ -201,6 +204,9 @@ export class WebScrapingService {
 
             // The data is added to the array for later use
             page_data.splice(3, 0, request.technology.trim());
+
+            if (request.owner) page_data.push(request.owner);
+
             this.vuln_data.push(page_data);
           }
 
@@ -238,6 +244,7 @@ export class WebScrapingService {
       'Publish date',
       'Update date',
       'References',
+      'Owner',
     ];
 
     this.excelService.generate(columns, data, sheetName, xlsxName);
