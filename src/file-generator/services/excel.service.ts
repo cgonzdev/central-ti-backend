@@ -5,12 +5,7 @@ const xl = require('excel4node');
 
 @Injectable()
 export class ExcelService {
-  async generate(
-    columns: string[],
-    data: any[],
-    sheet: string,
-    filename: string,
-  ) {
+  generate(columns: string[], data: any[], sheet: string, filename: string) {
     const wb = new xl.Workbook();
     const ws = wb.addWorksheet(sheet);
 

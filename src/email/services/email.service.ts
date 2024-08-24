@@ -63,6 +63,9 @@ export class EmailService {
       if (email.isHTML) mailStructure.html = email.body;
       else mailStructure.text = email.body;
 
+      if (email.attachment)
+        mailStructure.attachments.push({ path: email.attachment });
+
       const info = await this.transporter.sendMail(mailStructure);
 
       return {

@@ -26,5 +26,6 @@ import config from '../config';
       inject: [config.KEY],
     },
   ],
+  exports: [EmailService],
 })
 export class EmailModule {}

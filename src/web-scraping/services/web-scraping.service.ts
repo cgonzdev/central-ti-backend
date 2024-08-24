@@ -4,6 +4,8 @@ import puppeteer, { Browser, Page } from 'puppeteer';
 
 import { EnumType, WebScrapingVulnDto } from '../dtos/web-scraping.dto';
 import { ExcelService } from '@/file-generator/services/excel.service';
+import { EmailService } from '@/email/services/email.service';
+import { FileService } from '@/file-generator/services/file.service';
 
 import { handleException } from '@/common/handle-exception';
 import { WSVulnerabilitiesService } from './ws-vulnerabilities.service';
@@ -11,16 +13,27 @@ import { WSVulnerabilitiesService } from './ws-vulnerabilities.service';
 @Injectable()
 export class WebScrapingService {
   vuln_data = []; //* Global variable
-  excelName = 'export';
+  excelName = null;
 
   constructor(
     private wsvService: WSVulnerabilitiesService,
     private excelService: ExcelService,
+    private emailService: EmailService,
+    private fileService: FileService,
   ) {}
 
   async wsvuln(request: WebScrapingVulnDto) {
     try {
       this.vuln_data = [];
+      this.excelName = this.fileService.getFilePath('');
+
+      console.log('------------------------------------------');
+      console.log('Welcome to the web scraping process! \n');
+      console.log('Site: ' + request.site);
+      console.log('Tag' + request.tag);
+      console.log('Start date: ' + request.dateMin);
+      console.log('End date: ' + request.dateMax);
+      console.log('------------------------------------------');
 
       const browser: Browser = await puppeteer.launch({
         headless: false,
@@ -31,7 +44,7 @@ export class WebScrapingService {
         const vulnInfo = await this.wsvService.getByTag(request.tag);
 
         if (vulnInfo) {
-          this.excelName = `${vulnInfo.tag}_${request.dateMin}_${request.dateMax}`;
+          this.excelName += `${vulnInfo.tag}_${request.dateMin}_${request.dateMax}`;
           for (const technology of vulnInfo.technologies) {
             const incibeParams = {
               technology: technology.name,
@@ -44,6 +57,7 @@ export class WebScrapingService {
           }
         }
       } else if (request.type === EnumType.Technology) {
+        this.excelName += request.tag;
         const incibeParams = JSON.parse(JSON.stringify(request));
         if (request.site === 'INCIBE') {
           incibeParams.technology = request.tag;
@@ -60,6 +74,17 @@ export class WebScrapingService {
     } finally {
       if (this.vuln_data.length > 0) {
         this.excelExport(this.vuln_data, 'Vulnerabitilies', this.excelName);
+        if (request.emailToSend) {
+          this.emailService.send({
+            to: request.emailToSend.to,
+            subject: request.emailToSend.subject,
+            body: request.emailToSend.body,
+            attachment: `${this.excelName}.xlsx`,
+            isHTML: true,
+          });
+
+          await this.fileService.deleteFile(`${this.excelName}.xlsx`);
+        }
       }
     }
   }
@@ -109,122 +134,125 @@ export class WebScrapingService {
         '#views-bootstrap-vulnerabilities-page-1',
       );
 
-      if (existsInfo) {
-        // Check if the class that determines pagination exists.
-        const pager = await page.$('.pager');
-        let nextPage = null;
+      if (!existsInfo) {
+        console.warn(`404 Not found for ${request.technology}`);
+        await page.close();
+        return 404;
+      }
 
-        // Run the entire information gathering process at least once. If pager is set, the loop continues until the pages end
-        do {
-          // Gets the links where the vulnerabilities information is
-          const vulnerabilities_links = await page.evaluate(() => {
-            // verifies that the element containing the vulnerabilities exists
-            const existsInfo = document.getElementById(
-              'views-bootstrap-vulnerabilities-page-1',
-            );
+      // Check if the class that determines pagination exists.
+      const pager = await page.$('.pager');
+      let nextPage = null;
 
-            // If it does not exist, do not continue with the scrapping process
-            if (!existsInfo) return;
+      // Run the entire information gathering process at least once. If pager is set, the loop continues until the pages end
+      do {
+        // Gets the links where the vulnerabilities information is
+        const vulnerabilities_links = await page.evaluate(() => {
+          // verifies that the element containing the vulnerabilities exists
+          const existsInfo = document.getElementById(
+            'views-bootstrap-vulnerabilities-page-1',
+          );
 
-            // gets all nodes with the vulnerabilities
-            const elements = document.querySelectorAll(
-              '#views-bootstrap-vulnerabilities-page-1 a[href]',
-            );
+          // If it does not exist, do not continue with the scrapping process
+          if (!existsInfo) return;
 
-            // filters and returns only the urls
-            const links = Array.from(elements).map((item) => {
-              return item.getAttribute('href');
-            });
+          // gets all nodes with the vulnerabilities
+          const elements = document.querySelectorAll(
+            '#views-bootstrap-vulnerabilities-page-1 a[href]',
+          );
 
-            return links;
+          // filters and returns only the urls
+          const links = Array.from(elements).map((item) => {
+            return item.getAttribute('href');
           });
 
-          // If there are no links, return
-          if (!vulnerabilities_links) {
-            console.warn(`404 Not found for ${request.technology}`);
-            return 404;
-          }
+          return links;
+        });
 
-          // If links exist, report a status of ok and create a new tab
-          console.info(`200 OK found for ${request.technology}`);
-          const newPage = await browser.newPage();
+        // If there are no links, return
+        if (!vulnerabilities_links) {
+          return 404;
+        }
 
-          // It iterates over the number of links in a loop [for ... of], to handle asynchrony
-          for (const vuln of vulnerabilities_links) {
-            // Go to the specific link of the vulnerability
-            await newPage.goto(`https://www.incibe.es/${vuln}`, {
-              waitUntil: 'load',
-              timeout: 60000,
+        // If links exist, report a status of ok and create a new tab
+        console.info(`200 OK found for ${request.technology}`);
+        const newPage = await browser.newPage();
+
+        // It iterates over the number of links in a loop [for ... of], to handle asynchrony
+        for (const vuln of vulnerabilities_links) {
+          // Go to the specific link of the vulnerability
+          await newPage.goto(`https://www.incibe.es/${vuln}`, {
+            waitUntil: 'load',
+            timeout: 60000,
+          });
+
+          // Evaluate and return all necessary data
+          const page_data = await newPage.evaluate(() => {
+            const title = document.querySelector('.node-title').textContent;
+
+            const CVE =
+              document.querySelector('.breadcrumb').lastElementChild
+                .textContent;
+
+            const description = document.querySelector(
+              '.field-vulnerability-description .content',
+            ).textContent;
+
+            const desc_div = document.querySelector(
+              '.field-vulnerability-description',
+            );
+
+            const desc_div_data = Array.from(
+              desc_div.children[0].querySelectorAll('.date'),
+            );
+
+            const data = desc_div_data.map((item) => {
+              return item.textContent.trim();
             });
 
-            // Evaluate and return all necessary data
-            const page_data = await newPage.evaluate(() => {
-              const title = document.querySelector('.node-title').textContent;
+            const references = [];
 
-              const CVE =
-                document.querySelector('.breadcrumb').lastElementChild
-                  .textContent;
+            document
+              .querySelectorAll('.field-vulnerability-documents a')
+              .forEach((item) => references.push(item.getAttribute('href')));
 
-              const description = document.querySelector(
-                '.field-vulnerability-description .content',
-              ).textContent;
+            const severity = data[0];
+            const publishDate = data[2];
+            const updateDate = data[3];
 
-              const desc_div = document.querySelector(
-                '.field-vulnerability-description',
-              );
+            return [
+              title.trim(),
+              CVE.trim(),
+              description.trim(),
+              severity.trim(),
+              publishDate.trim(),
+              updateDate.trim(),
+              references.join('\n'),
+            ];
+          });
 
-              const desc_div_data = Array.from(
-                desc_div.children[0].querySelectorAll('.date'),
-              );
+          // The data is added to the array for later use
+          page_data.splice(3, 0, request.technology.trim());
 
-              const data = desc_div_data.map((item) => {
-                return item.textContent.trim();
-              });
+          if (request.owner) page_data.push(request.owner);
 
-              const references = [];
+          this.vuln_data.push(page_data);
+        }
 
-              document
-                .querySelectorAll('.field-vulnerability-documents a')
-                .forEach((item) => references.push(item.getAttribute('href')));
+        // The previously created tab is closed
+        await newPage.close();
 
-              const severity = data[0];
-              const publishDate = data[2];
-              const updateDate = data[3];
+        // Check if a new page exists in the search pager
+        nextPage = await page.$('.pager a[rel="next"]');
 
-              return [
-                title.trim(),
-                CVE.trim(),
-                description.trim(),
-                severity.trim(),
-                publishDate.trim(),
-                updateDate.trim(),
-                references.join('\n'),
-              ];
-            });
-
-            // The data is added to the array for later use
-            page_data.splice(3, 0, request.technology.trim());
-
-            if (request.owner) page_data.push(request.owner);
-
-            this.vuln_data.push(page_data);
-          }
-
-          // The previously created tab is closed
-          await newPage.close();
-
-          // Check if a new page exists in the search pager
-          nextPage = await page.$('.pager a[rel="next"]');
-
-          // If it exists, on the first page, it simulates a click on the next page and continues the loop
-          if (nextPage) {
-            await Promise.all([
-              page.waitForNavigation({ waitUntil: 'networkidle0' }),
-              page.click('.pager a[rel="next"]'),
-            ]);
-          }
-        } while (pager && nextPage);
-      }
+        // If it exists, on the first page, it simulates a click on the next page and continues the loop
+        if (nextPage) {
+          await Promise.all([
+            page.waitForNavigation({ waitUntil: 'networkidle0' }),
+            page.click('.pager a[rel="next"]'),
+          ]);
+        }
+      } while (pager && nextPage);
 
       await page.close();
       return 'ok';
