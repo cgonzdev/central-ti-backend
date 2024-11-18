@@ -3,9 +3,9 @@ import { Injectable, ConflictException } from '@nestjs/common';
 import puppeteer, { Browser, Page } from 'puppeteer';
 
 import { EnumType, WebScrapingVulnDto } from '../dtos/web-scraping.dto';
-import { ExcelService } from '@/file-generator/services/excel.service';
+import { ExcelService } from '@/file/services/excel.service';
 import { EmailService } from '@/email/services/email.service';
-import { FileService } from '@/file-generator/services/file.service';
+import { FileService } from '@/file/services/file.service';
 
 import { handleException } from '@/common/handle-exception';
 import { WSVulnerabilitiesService } from './ws-vulnerabilities.service';
@@ -30,7 +30,7 @@ export class WebScrapingService {
       console.log('------------------------------------------');
       console.log('Welcome to the web scraping process! \n');
       console.log('Site: ' + request.site);
-      console.log('Tag' + request.tag);
+      console.log('Tag: ' + request.tag);
       console.log('Start date: ' + request.dateMin);
       console.log('End date: ' + request.dateMax);
       console.log('------------------------------------------');

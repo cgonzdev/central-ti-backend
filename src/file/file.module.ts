@@ -6,4 +6,4 @@ import { ExcelService } from './services/excel.service';
   providers: [FileService, ExcelService],
   exports: [FileService, ExcelService],
 })
-export class FileGeneratorModule {}
+export class FileModule {}

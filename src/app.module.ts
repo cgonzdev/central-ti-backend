@@ -10,7 +10,7 @@ import { EmailModule } from './email/email.module';
 import { WebScrapingModule } from './web-scraping/web-scraping.module';
 import { InfoModule } from './info/info.module';
 import { AuthModule } from './auth/auth.module';
-import { FileGeneratorModule } from './file-generator/file-generator.module';
+import { FileModule } from './file/file.module';
 
 import config from './config';
 
@@ -37,7 +37,7 @@ import config from './config';
     WebScrapingModule,
     InfoModule,
     AuthModule,
-    FileGeneratorModule,
+    FileModule,
   ],
   controllers: [AppController],
   providers: [AppService],

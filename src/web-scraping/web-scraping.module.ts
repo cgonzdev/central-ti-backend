@@ -11,13 +11,13 @@ import {
 import { WebScrapingController } from './controllers/web-scraping.controller';
 import { WebScrapingService } from './services/web-scraping.service';
 
-import { FileGeneratorModule } from '@/file-generator/file-generator.module';
+import { FileModule } from '@/file/file.module';
 import { EmailModule } from '@/email/email.module';
 
 @Module({
   imports: [
     EmailModule,
-    FileGeneratorModule,
+    FileModule,
     MongooseModule.forFeature([
       { name: WSVulnerabilities.name, schema: WSVulnerabilitiesSchema },
     ]),
