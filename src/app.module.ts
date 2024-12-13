@@ -11,6 +11,7 @@ import { WebScrapingModule } from './web-scraping/web-scraping.module';
 import { InfoModule } from './info/info.module';
 import { AuthModule } from './auth/auth.module';
 import { FileModule } from './file/file.module';
+import { ToolsModule } from './tools/tools.module';
 
 import config from './config';
 
@@ -38,6 +39,7 @@ import config from './config';
     InfoModule,
     AuthModule,
     FileModule,
+    ToolsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

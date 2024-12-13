@@ -21,5 +21,8 @@ export default registerAs('config', () => {
       jwtSecret: process.env.JWT_SECRET,
       jwtExpires: process.env.JWT_EXPIRES,
     },
+    api: {
+      intelx: process.env.INTELX_API,
+    },
   };
 });
