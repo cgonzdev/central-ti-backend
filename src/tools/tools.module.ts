@@ -5,6 +5,8 @@ import { HttpModule } from '@nestjs/axios';
 import { IntelxController } from './api/controllers/intelx.controller';
 import { IntelxService } from './api/services/intelx.service';
 
+import { CheckerController } from './checker/controllers/checker.controller';
+
 import { FileModule } from '@/file/file.module';
 import { EmailModule } from '@/email/email.module';
 
@@ -12,7 +14,7 @@ import config from '../config';
 
 @Module({
   imports: [HttpModule, EmailModule, FileModule],
-  controllers: [IntelxController],
+  controllers: [IntelxController, CheckerController],
   providers: [
     IntelxService,
     {
