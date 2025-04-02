@@ -6,26 +6,36 @@ import { EnumType, WebScrapingVulnDto } from '../dtos/web-scraping.dto';
 import { ExcelService } from '@/file/services/excel.service';
 import { EmailService } from '@/email/services/email.service';
 import { FileService } from '@/file/services/file.service';
+import { PdfService } from '@/file/services/pdf.service';
 
 import { handleException } from '@/common/handle-exception';
 import { WSVulnerabilitiesService } from './ws-vulnerabilities.service';
+import {
+  groupByOwner,
+  incibeFormatFromArray,
+} from '@/file/helpers/formatting.helper';
+import { incibeVulnTemplatePdf } from '@/file/templates/pdf-vulnerabilities.template';
 
 @Injectable()
 export class WebScrapingService {
   vuln_data = []; //* Global variable
+  attachments = [];
   excelName = null;
+  pdfName = null;
 
   constructor(
     private wsvService: WSVulnerabilitiesService,
     private excelService: ExcelService,
     private emailService: EmailService,
     private fileService: FileService,
+    private pdfService: PdfService,
   ) {}
 
   async wsvuln(request: WebScrapingVulnDto) {
     try {
       this.vuln_data = [];
       this.excelName = this.fileService.getFilePath('');
+      this.pdfName = this.fileService.getFilePath('');
 
       console.log('------------------------------------------');
       console.log('Welcome to the web scraping process! \n');
@@ -45,6 +55,7 @@ export class WebScrapingService {
 
         if (vulnInfo) {
           this.excelName += `${vulnInfo.tag}_${request.dateMin}_${request.dateMax}`;
+          this.pdfName += `${request.dateMin}_${request.dateMax}`;
           for (const technology of vulnInfo.technologies) {
             const incibeParams = {
               technology: technology.name,
@@ -73,17 +84,18 @@ export class WebScrapingService {
       throw new ConflictException(`A conflict has occurredo: ${exception}`);
     } finally {
       if (this.vuln_data.length > 0) {
+        await this.pdfExport(this.vuln_data, this.pdfName);
         this.excelExport(this.vuln_data, 'Vulnerabitilies', this.excelName);
+        this.attachments.push({ path: `${this.excelName}.xlsx` });
+
         if (request.emailToSend) {
           this.emailService.send({
             to: request.emailToSend.to,
             subject: request.emailToSend.subject,
             body: request.emailToSend.body,
-            attachment: `${this.excelName}.xlsx`,
+            attachments: this.attachments,
             isHTML: true,
           });
-
-          await this.fileService.deleteFile(`${this.excelName}.xlsx`);
         }
       }
     }
@@ -276,5 +288,20 @@ export class WebScrapingService {
     ];
 
     this.excelService.generate(columns, data, sheetName, xlsxName);
+  }
+
+  async pdfExport(data: any, pdfName: string) {
+    const pdfData = incibeFormatFromArray(data);
+    const pdfDataGrouped = groupByOwner(pdfData);
+
+    for (const group of pdfDataGrouped) {
+      const owner = group[0].owner;
+      const logo = await this.fileService.getLogo(owner, 'png');
+      const pdfDefinition = incibeVulnTemplatePdf(group, logo);
+
+      await this.pdfService.savePdf(pdfDefinition, `${pdfName}_${owner}.pdf`);
+
+      this.attachments.push({ path: `${pdfName}_${owner}.pdf` });
+    }
   }
 }

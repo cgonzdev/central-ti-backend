@@ -21,7 +21,17 @@ export class FileService {
     return `${appRoot.path}/src/assets/files/${name}`;
   }
 
-  getImagePath(name: string) {
-    return `${appRoot.path}/src/assets/images/${name}`;
+  getImagePath(folder: string, name: string) {
+    return `${appRoot.path}/src/assets/images/${folder}/${name}`;
+  }
+
+  async getLogo(name: string, ext: string) {
+    try {
+      const path = this.getImagePath('logos', `${name}.${ext}`);
+      await fs.access(path);
+      return path;
+    } catch {
+      return this.getImagePath('logos', `default.${ext}`);
+    }
   }
 }

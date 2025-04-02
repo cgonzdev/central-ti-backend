@@ -60,6 +60,10 @@ class Newsletter {
   readonly notices: Notices[];
 }
 
+class Attachment {
+  path: string;
+}
+
 export class SendEmailDto {
   @ApiProperty()
   @IsString()
@@ -77,9 +81,13 @@ export class SendEmailDto {
   readonly body: string;
 
   @ApiProperty()
-  @IsString()
+  @IsArray()
+  @ArrayUnique((dto) => dto.path)
+  @IsObject({ each: true })
+  @ValidateNested()
+  @Type(() => Attachment)
   @IsOptional()
-  readonly attachment: string;
+  readonly attachments: Attachment[];
 
   @ApiProperty()
   @IsBoolean()
