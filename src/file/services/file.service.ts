@@ -21,7 +21,8 @@ export class FileService {
     return `${appRoot.path}/src/assets/files/${name}`;
   }
 
-  getImagePath(folder: string, name: string) {
+  getImagePath(folder: string, name?: string) {
+    if (!name) return `${appRoot.path}/src/assets/images/${folder}`;
     return `${appRoot.path}/src/assets/images/${folder}/${name}`;
   }
 

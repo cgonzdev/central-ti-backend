@@ -124,7 +124,7 @@ export class WebScrapingService {
       let attempt = 0;
       while (attempt < 5) {
         try {
-          await page.goto(site, { waitUntil: 'load', timeout: 60000 });
+          await page.goto(site, { waitUntil: 'load', timeout: 0 });
           break;
         } catch (error) {
           console.log(`Attempt ${attempt + 1} failed: ${error.message}`);
@@ -195,7 +195,7 @@ export class WebScrapingService {
           // Go to the specific link of the vulnerability
           await newPage.goto(`https://www.incibe.es/${vuln}`, {
             waitUntil: 'load',
-            timeout: 60000,
+            timeout: 0,
           });
 
           // Evaluate and return all necessary data
