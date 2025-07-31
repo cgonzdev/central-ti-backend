@@ -40,3 +40,4 @@ lerna-debug.log*
 
 # Own
 src/assets
+src/file/templates/tmp/
