@@ -84,7 +84,8 @@ export class WebScrapingService {
       throw new ConflictException(`A conflict has occurredo: ${exception}`);
     } finally {
       if (this.vuln_data.length > 0) {
-        await this.pdfExport(this.vuln_data, this.pdfName);
+        const dates = { start: request.dateMin, end: request.dateMax };
+        await this.pdfExport(this.vuln_data, this.pdfName, dates);
         this.excelExport(this.vuln_data, 'Vulnerabitilies', this.excelName);
         this.attachments.push({ path: `${this.excelName}.xlsx` });
 
@@ -290,14 +291,18 @@ export class WebScrapingService {
     this.excelService.generate(columns, data, sheetName, xlsxName);
   }
 
-  async pdfExport(data: any, pdfName: string) {
+  async pdfExport(
+    data: any,
+    pdfName: string,
+    dates: { start: string; end: string },
+  ) {
     const pdfData = incibeFormatFromArray(data);
     const pdfDataGrouped = groupByOwner(pdfData);
 
     for (const group of pdfDataGrouped) {
       const owner = group[0].owner;
       const logo = await this.fileService.getLogo(owner, 'png');
-      const pdfDefinition = incibeVulnTemplatePdf(group, logo);
+      const pdfDefinition = incibeVulnTemplatePdf(group, logo, dates);
 
       await this.pdfService.savePdf(pdfDefinition, `${pdfName}_${owner}.pdf`);
 

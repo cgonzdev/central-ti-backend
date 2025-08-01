@@ -1,6 +1,8 @@
 import { Column, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { incibeInterface } from '../helpers/formatting.helper';
 
+import dayjs from 'dayjs';
+
 const logoCompany: Column = {
   stack: [
     {
@@ -74,7 +76,10 @@ const linkReferences = (references: string[]) => {
   return links;
 };
 
-const vulnerabilitiesContent = (vulns: any) => {
+const vulnerabilitiesContent = (
+  vulns: any,
+  dates: { start: string; end: string },
+) => {
   const data = [];
 
   //* First page
@@ -91,6 +96,10 @@ const vulnerabilitiesContent = (vulns: any) => {
     text: 'This is the first page of the report, where the cover page or anything else should go according to the customization you want to give it.',
     alignment: 'justify',
     margin: [0, 0, 0, 30],
+  });
+
+  data.push({
+    text: `${dayjs(dates.start).format('MMMM D[,] YYYY')} - ${dayjs(dates.end).format('MMMM D[,] YYYY')}`,
     pageBreak: 'after',
   });
 
@@ -229,6 +238,7 @@ const vulnerabilitiesContent = (vulns: any) => {
 export const incibeVulnTemplatePdf = (
   vulnerabilities: incibeInterface[],
   logoCustomerPath: string,
+  dates: { start: string; end: string },
 ): TDocumentDefinitions => ({
   pageSize: 'A4',
   pageMargins: [40, 60, 40, 50],
@@ -239,7 +249,7 @@ export const incibeVulnTemplatePdf = (
 
     return { columns: [logoCustomer(logoCustomerPath)] };
   },
-  content: vulnerabilitiesContent(vulnerabilities),
+  content: vulnerabilitiesContent(vulnerabilities, dates),
   footer: function (currentPage, pageCount) {
     if (currentPage === 1 || currentPage === pageCount) {
       return null;
